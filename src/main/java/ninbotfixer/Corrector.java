@@ -36,7 +36,11 @@ class Corrector {
                 obj.add("recommend", new Gson().toJsonTree(recommendFix));
                 System.out.println(new Gson().toJson(obj));
                 break;
-            case "fix":
+            case "fix-all":
+                fix(prefs, adjustments.breaking, fixFilter);
+                fix(prefs, adjustments.recommend, fixFilter);
+                break;
+            case "fix-breaking":
                 fix(prefs, adjustments.breaking, fixFilter);
                 break;
             default:
@@ -152,7 +156,7 @@ class Corrector {
     }
 
     private static void printUsage() {
-        System.err.println("Usage: <get|fix> <fix-descriptions> [fixes-to-apply]");
+        System.err.println("Usage: <get|fix-breaking|fix-all> <adjustments> [fixes-to-apply]");
         System.exit(1);
     }
 }
