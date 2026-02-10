@@ -4,6 +4,7 @@ package ninbotfixer;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import ninjabrainbot.Main;
 
 import java.util.*;
@@ -29,8 +30,9 @@ class Corrector {
         Preferences prefs = Main.getPreferences();
         switch (action) {
             case "get":
-                String[] breakingFix = get(prefs, adjustments.breaking).toArray(new String[0]);
-                String[] recommendFix = get(prefs, adjustments.recommend, breakingFix).toArray(new String[0]);
+                List<Result> breakingFix = get(prefs, adjustments.breaking);
+                List<Result> recommendFix = get(prefs, adjustments.recommend, breakingFix.stream()
+                        .map(c -> c.id).toArray(String[]::new));
                 JsonObject obj = new JsonObject();
                 obj.add("breaking", new Gson().toJsonTree(breakingFix));
                 obj.add("recommend", new Gson().toJsonTree(recommendFix));
@@ -49,12 +51,12 @@ class Corrector {
         }
     }
 
-    public static List<String> get(Preferences prefs, List<Adjuster> adjusters) {
+    public static List<Result> get(Preferences prefs, List<Adjuster> adjusters) {
         return get(prefs, adjusters, new String[]{});
     }
 
-    public static List<String> get(Preferences prefs, List<Adjuster> adjusters, String[] dontRepeat) {
-        List<String> result = new ArrayList<>();
+    public static List<Result> get(Preferences prefs, List<Adjuster> adjusters, String[] dontRepeat) {
+        List<Result> results = new ArrayList<>();
         List<String> noRepeat = Arrays.asList(dontRepeat);
         for (Adjuster adjuster : adjusters) {
             if (noRepeat.contains(adjuster.id)) continue;
@@ -65,44 +67,69 @@ class Corrector {
                 case "int": {
                     int defValue = defaultValue == null ? 0 : defaultValue.getAsInt();
                     int allowedError = adjuster.allowedError == null ? 0 : adjuster.allowedError.intValue();
-                    if (abs(prefs.getInt(adjuster.id, defValue) - adjustment.value.getAsInt()) > allowedError) {
-                        result.add(adjuster.id);
+                    int oldVal = prefs.getInt(adjuster.id, defValue);
+                    int newVal = adjustment.value.getAsInt();
+                    if (abs(oldVal - newVal) > allowedError) {
+                        Result result = new Result(adjuster.id);
+                        result.oldValue = new Adjuster.JavaValue("int", new JsonPrimitive(oldVal));
+                        result.newValue = new Adjuster.JavaValue("int", new JsonPrimitive(newVal));
+                        results.add(result);
                     }
                     break;
                 }
                 case "double": {
                     double defValue = defaultValue == null ? 0 : defaultValue.getAsDouble();
                     double allowedError = adjuster.allowedError == null ? EPSILON : adjuster.allowedError;
-                    if (abs(prefs.getDouble(adjuster.id, defValue) - adjustment.value.getAsDouble()) > allowedError) {
-                        result.add(adjuster.id);
+                    double oldVal = prefs.getDouble(adjuster.id, defValue);
+                    double newVal = adjustment.value.getAsDouble();
+                    if (abs(oldVal - newVal) > allowedError) {
+                        Result result = new Result(adjuster.id);
+                        result.oldValue = new Adjuster.JavaValue("double", new JsonPrimitive(oldVal));
+                        result.newValue = new Adjuster.JavaValue("double", new JsonPrimitive(newVal));
+                        results.add(result);
                     }
                     break;
                 }
                 case "float": {
                     float defValue = defaultValue == null ? 0 : defaultValue.getAsFloat();
                     float allowedError = adjuster.allowedError == null ? EPSILON_F : adjuster.allowedError.floatValue();
-                    if (abs(prefs.getDouble(adjuster.id, defValue) - adjustment.value.getAsFloat()) > allowedError) {
-                        result.add(adjuster.id);
+                    float oldVal = prefs.getFloat(adjuster.id, defValue);
+                    float newVal = adjustment.value.getAsFloat();
+                    if (abs(oldVal - newVal) > allowedError) {
+                        Result result = new Result(adjuster.id);
+                        result.oldValue = new Adjuster.JavaValue("float", new JsonPrimitive(oldVal));
+                        result.newValue = new Adjuster.JavaValue("float", new JsonPrimitive(newVal));
+                        results.add(result);
                     }
                     break;
                 }
                 case "boolean": {
                     boolean defValue = defaultValue != null && defaultValue.getAsBoolean();
-                    if (prefs.getBoolean(adjuster.id, defValue) != adjustment.value.getAsBoolean()) {
-                        result.add(adjuster.id);
+                    boolean oldVal = prefs.getBoolean(adjuster.id, defValue);
+                    boolean newVal = adjustment.value.getAsBoolean();
+                    if (oldVal != newVal) {
+                        Result result = new Result(adjuster.id);
+                        result.oldValue = new Adjuster.JavaValue("boolean", new JsonPrimitive(oldVal));
+                        result.newValue = new Adjuster.JavaValue("boolean", new JsonPrimitive(newVal));
+                        results.add(result);
                     }
                     break;
                 }
                 case "string": {
                     String defValue = defaultValue == null ? "" : defaultValue.getAsString();
-                    if (!adjustment.value.getAsString().equals(prefs.get(adjuster.id, defValue))) {
-                        result.add(adjuster.id);
+                    String oldVal = adjustment.value.getAsString();
+                    String newVal = prefs.get(adjuster.id, defValue);
+                    if (!oldVal.equals(newVal)) {
+                        Result result = new Result(adjuster.id);
+                        result.oldValue = new Adjuster.JavaValue("string", new JsonPrimitive(oldVal));
+                        result.newValue = new Adjuster.JavaValue("string", new JsonPrimitive(newVal));
+                        results.add(result);
                     }
                     break;
                 }
             }
         }
-        return result;
+        return results;
     }
 
     public static void fix(Preferences prefs, List<Adjuster> adjusters, String[] fixFilter) {
@@ -158,5 +185,15 @@ class Corrector {
     private static void printUsage() {
         System.err.println("Usage: <get|fix-breaking|fix-all> <adjustments> [fixes-to-apply]");
         System.exit(1);
+    }
+
+    public static class Result {
+        public String id;
+        public Adjuster.JavaValue oldValue;
+        public Adjuster.JavaValue newValue;
+
+        public Result(String id) {
+            this.id = id;
+        }
     }
 }

@@ -13,5 +13,10 @@ public class Adjuster {
     public static class JavaValue {
         public String type;
         public JsonElement value;
+
+        public JavaValue(String type, JsonElement value) {
+            this.type = type;
+            this.value = value;
+        }
     }
 }
